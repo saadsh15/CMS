@@ -29,6 +29,7 @@ RUN composer require --no-interaction --prefer-dist \
 
 # Bake custom portfolio modules into the image for standalone production deployments (Dokploy)
 COPY web/modules/custom /opt/drupal/web/modules/custom
+COPY apache/000-default.conf /etc/apache2/sites-available/000-default.conf
 
 # Prepare runtime directories
 RUN mkdir -p /opt/drupal/private /opt/drupal/state /opt/drupal/web/sites/default/files \

@@ -1,0 +1,11 @@
+name: 'Portfolio Website Builder'
+type: module
+description: 'Modular Paragraph-based website building blocks (Hero, Bento Grid, Showcase, Rich Text, Stats, Media Gallery, CTA, Module Embed).'
+package: 'Portfolio Platform'
+core_version_requirement: ^10.3 || ^11
+dependencies:
+  - drupal:field
+  - drupal:options
+  - drupal:text
+  - paragraphs:paragraphs
+  - entity_reference_revisions:entity_reference_revisions

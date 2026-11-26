@@ -1,0 +1,433 @@
+<?php
+
+/**
+ * @file
+ * Creates reusable Paragraph website-building blocks on module install.
+ */
+
+use Drupal\Core\Entity\Entity\EntityFormDisplay;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\paragraphs\Entity\ParagraphsType;
+
+/**
+ * Helper to create a Paragraph type if it does not exist.
+ */
+function _portfolio_builder_ensure_paragraph_type(string $id, string $label, string $description): void {
+  if (!ParagraphsType::load($id)) {
+    ParagraphsType::create([
+      'id' => $id,
+      'label' => $label,
+      'description' => $description,
+    ])->save();
+  }
+}
+
+/**
+ * Helper to ensure field storage, field instance, and form widget on a paragraph.
+ */
+function _portfolio_builder_ensure_field(
+  string $bundle,
+  string $field_name,
+  string $type,
+  string $label,
+  array $storage_settings = [],
+  array $field_settings = [],
+  int $cardinality = 1,
+  string $widget = '',
+  int $weight = 0,
+  string $description = '',
+  bool $required = FALSE,
+): void {
+  if (!FieldStorageConfig::loadByName('paragraph', $field_name)) {
+    FieldStorageConfig::create([
+      'field_name' => $field_name,
+      'entity_type' => 'paragraph',
+      'type' => $type,
+      'cardinality' => $cardinality,
+      'settings' => $storage_settings,
+    ])->save();
+  }
+
+  if (!FieldConfig::loadByName('paragraph', $bundle, $field_name)) {
+    FieldConfig::create([
+      'field_name' => $field_name,
+      'entity_type' => 'paragraph',
+      'bundle' => $bundle,
+      'label' => $label,
+      'description' => $description,
+      'required' => $required,
+      'settings' => $field_settings,
+    ])->save();
+  }
+
+  $form_display = EntityFormDisplay::load("paragraph.{$bundle}.default");
+  if (!$form_display) {
+    $form_display = EntityFormDisplay::create([
+      'targetEntityType' => 'paragraph',
+      'bundle' => $bundle,
+      'mode' => 'default',
+      'status' => TRUE,
+    ]);
+  }
+
+  $default_widgets = [
+    'string' => 'string_textfield',
+    'string_long' => 'string_textarea',
+    'text_long' => 'text_textarea',
+    'integer' => 'number',
+    'boolean' => 'boolean_checkbox',
+    'list_string' => 'options_select',
+    'entity_reference_revisions' => 'paragraphs',
+  ];
+
+  $form_display->setComponent($field_name, [
+    'type' => $widget ?: ($default_widgets[$type] ?? 'string_textfield'),
+    'weight' => $weight,
+  ])->save();
+}
+
+/**
+ * Helper to attach reusable background controls (Image, Stock, Video, Canvas) to a paragraph bundle.
+ */
+function _portfolio_builder_ensure_background_fields(string $bundle, int $start_weight = 10): void {
+  _portfolio_builder_ensure_field($bundle, 'field_bg_type', 'list_string', 'Background Mode', [
+    'allowed_values' => [
+      'image' => 'Background Image / Stock Photo',
+      'video' => 'Looping Ambient Video (MP4 / WebM)',
+      'ambient_canvas' => 'Living Architectural Canvas',
+      'architectural_topo' => 'Architectural Grid & Contours',
+      'none' => 'Pure Matte Surface',
+    ],
+  ], [], 1, 'options_select', $start_weight);
+  _portfolio_builder_ensure_field(
+    $bundle,
+    'field_bg_media_url',
+    'string',
+    'Background Image or Video URL',
+    [],
+    [],
+    1,
+    'string_textfield',
+    $start_weight + 1,
+    'Local path (e.g. /images/backgrounds/hero-architectural.png or /videos/loop.mp4) or external stock URL.'
+  );
+  _portfolio_builder_ensure_field(
+    $bundle,
+    'field_bg_poster_url',
+    'string',
+    'Video Poster Image URL (optional)',
+    [],
+    [],
+    1,
+    'string_textfield',
+    $start_weight + 2,
+    'Displayed while looping background video loads.'
+  );
+  _portfolio_builder_ensure_field($bundle, 'field_bg_overlay', 'list_string', 'Overlay Contrast Scrim', [
+    'allowed_values' => [
+      'subtle' => 'Subtle',
+      'medium' => 'Balanced (Recommended)',
+      'heavy' => 'High Contrast',
+      'editorial' => 'Dark Editorial',
+    ],
+  ], [], 1, 'options_select', $start_weight + 3);
+}
+
+/**
+ * Implements hook_install().
+ */
+function portfolio_builder_install(): void {
+  // ---------------------------------------------------------------------------
+  // Nested sub-items (used inside Bento Grid, Stats Strip, and Media Gallery)
+  // ---------------------------------------------------------------------------
+  _portfolio_builder_ensure_paragraph_type(
+    'bento_item',
+    'Bento Card Item',
+    'Individual interactive card inside a Bento Grid block.'
+  );
+  _portfolio_builder_ensure_field('bento_item', 'field_title', 'string', 'Card Title', [], [], 1, 'string_textfield', 0, '', TRUE);
+  _portfolio_builder_ensure_field('bento_item', 'field_subtitle', 'string_long', 'Description', [], [], 1, 'string_textarea', 1);
+  _portfolio_builder_ensure_field('bento_item', 'field_eyebrow', 'string', 'Badge / Eyebrow', [], [], 1, 'string_textfield', 2);
+  _portfolio_builder_ensure_field('bento_item', 'field_metric', 'string', 'Highlight Metric (optional, e.g. 99.9%)', [], [], 1, 'string_textfield', 3);
+  _portfolio_builder_ensure_field('bento_item', 'field_icon', 'string', 'Icon Name (lucide, e.g. cpu, layers, rocket, code-2, sparkles, terminal)', [], [], 1, 'string_textfield', 4);
+  _portfolio_builder_ensure_field('bento_item', 'field_span', 'list_string', 'Grid Span Size', [
+    'allowed_values' => [
+      '1x1' => 'Standard (1x1)',
+      '2x1' => 'Wide (2x1)',
+      '1x2' => 'Tall (1x2)',
+      '2x2' => 'Featured (2x2)',
+    ],
+  ], [], 1, 'options_select', 5);
+  _portfolio_builder_ensure_field('bento_item', 'field_accent', 'list_string', 'Accent Color', [
+    'allowed_values' => [
+      'cyan' => 'Electric Cyan',
+      'violet' => 'Vibrant Violet',
+      'emerald' => 'Neon Emerald',
+      'amber' => 'Warm Amber',
+      'rose' => 'Signal Rose',
+    ],
+  ], [], 1, 'options_select', 6);
+  _portfolio_builder_ensure_field('bento_item', 'field_link_url', 'string', 'Link URL (optional)', [], [], 1, 'string_textfield', 7);
+  _portfolio_builder_ensure_field('bento_item', 'field_link_label', 'string', 'Link Label (optional)', [], [], 1, 'string_textfield', 8);
+  _portfolio_builder_ensure_field('bento_item', 'field_image_url', 'string', 'Visual Thumbnail URL (optional)', [], [], 1, 'string_textfield', 9, 'Optional image shown inside the bento card, e.g. /images/backgrounds/section-monolith.jpg');
+
+  _portfolio_builder_ensure_paragraph_type(
+    'stat_item',
+    'Metric Item',
+    'Single metric/stat value inside a Stats Strip block.'
+  );
+  _portfolio_builder_ensure_field('stat_item', 'field_metric', 'string', 'Value (e.g. 12+, 99.9%, 24/7)', [], [], 1, 'string_textfield', 0, '', TRUE);
+  _portfolio_builder_ensure_field('stat_item', 'field_title', 'string', 'Label', [], [], 1, 'string_textfield', 1, '', TRUE);
+  _portfolio_builder_ensure_field('stat_item', 'field_subtitle', 'string', 'Sub-caption (optional)', [], [], 1, 'string_textfield', 2);
+
+  _portfolio_builder_ensure_paragraph_type(
+    'media_item',
+    'Media Gallery Item',
+    'Image or visual showcase item inside a Media Gallery block.'
+  );
+  _portfolio_builder_ensure_field('media_item', 'field_title', 'string', 'Title', [], [], 1, 'string_textfield', 0);
+  _portfolio_builder_ensure_field('media_item', 'field_subtitle', 'string', 'Caption', [], [], 1, 'string_textfield', 1);
+  _portfolio_builder_ensure_field('media_item', 'field_image_url', 'string', 'Image URL', [], [], 1, 'string_textfield', 2, 'Absolute URL or path under /images/');
+  _portfolio_builder_ensure_field('media_item', 'field_eyebrow', 'string', 'Tag / Label', [], [], 1, 'string_textfield', 3);
+
+  // ---------------------------------------------------------------------------
+  // 1. Hero Section Block
+  // ---------------------------------------------------------------------------
+  _portfolio_builder_ensure_paragraph_type(
+    'hero_section',
+    'Hero Section',
+    'Bold top-of-page hero with eyebrow status pill, headline, subtitle, and primary/secondary CTAs.'
+  );
+  _portfolio_builder_ensure_field('hero_section', 'field_eyebrow', 'string', 'Status / Eyebrow Pill', [], [], 1, 'string_textfield', 0);
+  _portfolio_builder_ensure_field('hero_section', 'field_title', 'string', 'Main Headline', [], [], 1, 'string_textfield', 1, '', TRUE);
+  _portfolio_builder_ensure_field('hero_section', 'field_highlight_text', 'string', 'Gradient Highlight Phrase (optional)', [], [], 1, 'string_textfield', 2);
+  _portfolio_builder_ensure_field('hero_section', 'field_subtitle', 'string_long', 'Subtitle / Bio Intro', [], [], 1, 'string_textarea', 3);
+  _portfolio_builder_ensure_field('hero_section', 'field_cta_primary_label', 'string', 'Primary Button Label', [], [], 1, 'string_textfield', 4);
+  _portfolio_builder_ensure_field('hero_section', 'field_cta_primary_url', 'string', 'Primary Button URL', [], [], 1, 'string_textfield', 5);
+  _portfolio_builder_ensure_field('hero_section', 'field_cta_secondary_label', 'string', 'Secondary Button Label', [], [], 1, 'string_textfield', 6);
+  _portfolio_builder_ensure_field('hero_section', 'field_cta_secondary_url', 'string', 'Secondary Button URL', [], [], 1, 'string_textfield', 7);
+  _portfolio_builder_ensure_field('hero_section', 'field_variant', 'list_string', 'Hero Style Variant', [
+    'allowed_values' => [
+      'spotlight' => 'Executive Split (Hero + Profile Card)',
+      'split' => 'Split Grid + Interactive Preview',
+      'minimal' => 'Editorial Compact',
+    ],
+  ], [], 1, 'options_select', 8);
+  _portfolio_builder_ensure_field('hero_section', 'field_portrait_url', 'string', 'Portrait Image URL', [], [], 1, 'string_textfield', 9, 'e.g. /images/saad-portrait.jpg or external image URL.');
+  _portfolio_builder_ensure_field('hero_section', 'field_card_name', 'string', 'Profile Card Name', [], [], 1, 'string_textfield', 10);
+  _portfolio_builder_ensure_field('hero_section', 'field_card_tagline', 'string', 'Profile Card Tagline', [], [], 1, 'string_textfield', 11);
+  _portfolio_builder_ensure_field('hero_section', 'field_card_quote', 'string_long', 'Editorial Quote', [], [], 1, 'string_textarea', 12);
+  _portfolio_builder_ensure_field('hero_section', 'field_card_caption', 'string_long', 'Quote Supporting Caption', [], [], 1, 'string_textarea', 13);
+  _portfolio_builder_ensure_background_fields('hero_section', 14);
+
+  // ---------------------------------------------------------------------------
+  // 1b. Cinematic Background Band (Image / Stock / Video / Living Canvas)
+  // ---------------------------------------------------------------------------
+  _portfolio_builder_ensure_paragraph_type(
+    'background_banner',
+    'Cinematic Background Band',
+    'Full-width visual section supporting bespoke photography, stock photo URLs, looping MP4/WebM video, or living architectural canvas.'
+  );
+  _portfolio_builder_ensure_field('background_banner', 'field_eyebrow', 'string', 'Eyebrow', [], [], 1, 'string_textfield', 0);
+  _portfolio_builder_ensure_field('background_banner', 'field_title', 'string', 'Headline', [], [], 1, 'string_textfield', 1, '', TRUE);
+  _portfolio_builder_ensure_field('background_banner', 'field_subtitle', 'string_long', 'Supporting Statement', [], [], 1, 'string_textarea', 2);
+  _portfolio_builder_ensure_field('background_banner', 'field_cta_primary_label', 'string', 'Primary Button Label', [], [], 1, 'string_textfield', 3);
+  _portfolio_builder_ensure_field('background_banner', 'field_cta_primary_url', 'string', 'Primary Button URL', [], [], 1, 'string_textfield', 4);
+  _portfolio_builder_ensure_field('background_banner', 'field_cta_secondary_label', 'string', 'Secondary Button Label', [], [], 1, 'string_textfield', 5);
+  _portfolio_builder_ensure_field('background_banner', 'field_cta_secondary_url', 'string', 'Secondary Button URL', [], [], 1, 'string_textfield', 6);
+  _portfolio_builder_ensure_field('background_banner', 'field_height', 'list_string', 'Section Height', [
+    'allowed_values' => [
+      'compact' => 'Compact',
+      'medium' => 'Standard',
+      'tall' => 'Tall Cinematic',
+    ],
+  ], [], 1, 'options_select', 7);
+  _portfolio_builder_ensure_background_fields('background_banner', 8);
+
+  // ---------------------------------------------------------------------------
+  // 2. Bento Grid Block
+  // ---------------------------------------------------------------------------
+  _portfolio_builder_ensure_paragraph_type(
+    'bento_grid',
+    'Bento Grid',
+    'Interactive spotlight bento grid composed of modular Bento Card Items.'
+  );
+  _portfolio_builder_ensure_field('bento_grid', 'field_eyebrow', 'string', 'Section Eyebrow', [], [], 1, 'string_textfield', 0);
+  _portfolio_builder_ensure_field('bento_grid', 'field_title', 'string', 'Section Heading', [], [], 1, 'string_textfield', 1);
+  _portfolio_builder_ensure_field('bento_grid', 'field_subtitle', 'string_long', 'Section Intro', [], [], 1, 'string_textarea', 2);
+  _portfolio_builder_ensure_field('bento_grid', 'field_layout', 'list_string', 'Grid Layout', [
+    'allowed_values' => [
+      'asymmetric' => 'Asymmetric Bento (3-col responsive)',
+      'two_col' => '2-Column Wide Grid',
+      'three_col' => '3-Column Uniform Grid',
+    ],
+  ], [], 1, 'options_select', 3);
+  _portfolio_builder_ensure_field(
+    'bento_grid',
+    'field_bento_items',
+    'entity_reference_revisions',
+    'Bento Cards',
+    ['target_type' => 'paragraph'],
+    [
+      'handler' => 'default:paragraph',
+      'handler_settings' => [
+        'negate' => 0,
+        'target_bundles' => ['bento_item' => 'bento_item'],
+        'target_bundles_drag_drop' => [
+          'bento_item' => ['weight' => 0, 'enabled' => TRUE],
+        ],
+      ],
+    ],
+    -1,
+    'paragraphs',
+    4
+  );
+
+  // ---------------------------------------------------------------------------
+  // 3. Dynamic Showcase Block (Live Projects or Blogs query)
+  // ---------------------------------------------------------------------------
+  _portfolio_builder_ensure_paragraph_type(
+    'showcase_block',
+    'Dynamic Showcase (Projects / Blogs)',
+    'Dynamically pulls live Projects (e.g. Currently Building) or Blog Posts from Drupal.'
+  );
+  _portfolio_builder_ensure_field('showcase_block', 'field_eyebrow', 'string', 'Section Eyebrow', [], [], 1, 'string_textfield', 0);
+  _portfolio_builder_ensure_field('showcase_block', 'field_title', 'string', 'Section Heading', [], [], 1, 'string_textfield', 1, '', TRUE);
+  _portfolio_builder_ensure_field('showcase_block', 'field_subtitle', 'string_long', 'Section Subtitle', [], [], 1, 'string_textarea', 2);
+  _portfolio_builder_ensure_field('showcase_block', 'field_source', 'list_string', 'Content Source', [
+    'allowed_values' => [
+      'projects' => 'Projects',
+      'blogs' => 'Blog Posts',
+    ],
+  ], [], 1, 'options_select', 3);
+  _portfolio_builder_ensure_field('showcase_block', 'field_filter', 'list_string', 'Filter Mode', [
+    'allowed_values' => [
+      'in_progress' => 'Currently Working On (In Progress)',
+      'featured' => 'Featured Items',
+      'all' => 'Latest All',
+    ],
+  ], [], 1, 'options_select', 4);
+  _portfolio_builder_ensure_field('showcase_block', 'field_limit', 'integer', 'Maximum Items', [], ['min' => 1, 'max' => 12], 1, 'number', 5);
+  _portfolio_builder_ensure_field('showcase_block', 'field_link_url', 'string', 'View All URL (optional)', [], [], 1, 'string_textfield', 6);
+  _portfolio_builder_ensure_field('showcase_block', 'field_link_label', 'string', 'View All Label (optional)', [], [], 1, 'string_textfield', 7);
+
+  // ---------------------------------------------------------------------------
+  // 4. Rich Text Editorial Block
+  // ---------------------------------------------------------------------------
+  _portfolio_builder_ensure_paragraph_type(
+    'rich_text_block',
+    'Rich Text Block',
+    'Formatted rich text / editorial content block powered by CKEditor.'
+  );
+  _portfolio_builder_ensure_field('rich_text_block', 'field_eyebrow', 'string', 'Eyebrow (optional)', [], [], 1, 'string_textfield', 0);
+  _portfolio_builder_ensure_field('rich_text_block', 'field_title', 'string', 'Heading (optional)', [], [], 1, 'string_textfield', 1);
+  _portfolio_builder_ensure_field('rich_text_block', 'field_body', 'text_long', 'Rich Body Content', [], [], 1, 'text_textarea', 2, '', TRUE);
+  _portfolio_builder_ensure_field('rich_text_block', 'field_width', 'list_string', 'Container Width', [
+    'allowed_values' => [
+      'narrow' => 'Narrow (Editorial)',
+      'medium' => 'Medium',
+      'wide' => 'Full Container',
+    ],
+  ], [], 1, 'options_select', 3);
+
+  // ---------------------------------------------------------------------------
+  // 5. Stats Strip Block
+  // ---------------------------------------------------------------------------
+  _portfolio_builder_ensure_paragraph_type(
+    'stats_strip',
+    'Stats / Metrics Strip',
+    'Animated horizontal strip of key metrics and milestones.'
+  );
+  _portfolio_builder_ensure_field('stats_strip', 'field_title', 'string', 'Optional Heading', [], [], 1, 'string_textfield', 0);
+  _portfolio_builder_ensure_field(
+    'stats_strip',
+    'field_stat_items',
+    'entity_reference_revisions',
+    'Metrics',
+    ['target_type' => 'paragraph'],
+    [
+      'handler' => 'default:paragraph',
+      'handler_settings' => [
+        'negate' => 0,
+        'target_bundles' => ['stat_item' => 'stat_item'],
+        'target_bundles_drag_drop' => [
+          'stat_item' => ['weight' => 0, 'enabled' => TRUE],
+        ],
+      ],
+    ],
+    -1,
+    'paragraphs',
+    1
+  );
+
+  // ---------------------------------------------------------------------------
+  // 6. Media Gallery Block
+  // ---------------------------------------------------------------------------
+  _portfolio_builder_ensure_paragraph_type(
+    'media_gallery',
+    'Media Gallery',
+    'Showcase screenshots, architecture visuals, or demos in a responsive visual grid.'
+  );
+  _portfolio_builder_ensure_field('media_gallery', 'field_eyebrow', 'string', 'Eyebrow', [], [], 1, 'string_textfield', 0);
+  _portfolio_builder_ensure_field('media_gallery', 'field_title', 'string', 'Heading', [], [], 1, 'string_textfield', 1);
+  _portfolio_builder_ensure_field(
+    'media_gallery',
+    'field_media_items',
+    'entity_reference_revisions',
+    'Media Items',
+    ['target_type' => 'paragraph'],
+    [
+      'handler' => 'default:paragraph',
+      'handler_settings' => [
+        'negate' => 0,
+        'target_bundles' => ['media_item' => 'media_item'],
+        'target_bundles_drag_drop' => [
+          'media_item' => ['weight' => 0, 'enabled' => TRUE],
+        ],
+      ],
+    ],
+    -1,
+    'paragraphs',
+    2
+  );
+
+  // ---------------------------------------------------------------------------
+  // 7. CTA Banner Block
+  // ---------------------------------------------------------------------------
+  _portfolio_builder_ensure_paragraph_type(
+    'cta_banner',
+    'CTA Banner',
+    'High-contrast call-to-action card with gradient glow and action buttons.'
+  );
+  _portfolio_builder_ensure_field('cta_banner', 'field_eyebrow', 'string', 'Eyebrow', [], [], 1, 'string_textfield', 0);
+  _portfolio_builder_ensure_field('cta_banner', 'field_title', 'string', 'Headline', [], [], 1, 'string_textfield', 1, '', TRUE);
+  _portfolio_builder_ensure_field('cta_banner', 'field_subtitle', 'string_long', 'Supporting Text', [], [], 1, 'string_textarea', 2);
+  _portfolio_builder_ensure_field('cta_banner', 'field_cta_primary_label', 'string', 'Primary Button Label', [], [], 1, 'string_textfield', 3);
+  _portfolio_builder_ensure_field('cta_banner', 'field_cta_primary_url', 'string', 'Primary Button URL', [], [], 1, 'string_textfield', 4);
+  _portfolio_builder_ensure_field('cta_banner', 'field_cta_secondary_label', 'string', 'Secondary Button Label', [], [], 1, 'string_textfield', 5);
+  _portfolio_builder_ensure_field('cta_banner', 'field_cta_secondary_url', 'string', 'Secondary Button URL', [], [], 1, 'string_textfield', 6);
+  _portfolio_builder_ensure_field('cta_banner', 'field_accent', 'list_string', 'Theme Accent', [
+    'allowed_values' => [
+      'cyan' => 'Electric Cyan',
+      'violet' => 'Vibrant Violet',
+      'emerald' => 'Neon Emerald',
+      'amber' => 'Warm Amber',
+      'rose' => 'Signal Rose',
+    ],
+  ], [], 1, 'options_select', 7);
+  _portfolio_builder_ensure_background_fields('cta_banner', 8);
+
+  // ---------------------------------------------------------------------------
+  // 8. Pluggable Module Embed Block (Future Extensibility Bridge!)
+  // ---------------------------------------------------------------------------
+  _portfolio_builder_ensure_paragraph_type(
+    'module_embed',
+    'Pluggable Module Widget',
+    'Embed any registered platform module widget (e.g. lab-status, future tools, widgets) directly onto a page.'
+  );
+  _portfolio_builder_ensure_field('module_embed', 'field_module_id', 'string', 'Module ID (e.g. lab-status)', [], [], 1, 'string_textfield', 0, 'Matches a registered module ID from /api/v1/modules.', TRUE);
+  _portfolio_builder_ensure_field('module_embed', 'field_widget_name', 'string', 'Widget Variant (default: primary)', [], [], 1, 'string_textfield', 1);
+  _portfolio_builder_ensure_field('module_embed', 'field_title', 'string', 'Section Heading Override (optional)', [], [], 1, 'string_textfield', 2);
+  _portfolio_builder_ensure_field('module_embed', 'field_config_json', 'string_long', 'Widget Config JSON (optional)', [], [], 1, 'string_textarea', 3, 'Optional JSON object passed to the frontend module widget.');
+}

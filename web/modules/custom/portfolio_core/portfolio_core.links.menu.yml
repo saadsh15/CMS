@@ -1,0 +1,6 @@
+portfolio_core.appearance_settings:
+  title: 'Portfolio Typography & Appearance'
+  description: 'Configure the font used for links, labels, and site appearance.'
+  parent: system.admin_config_system
+  route_name: portfolio_core.appearance_settings
+  weight: 10

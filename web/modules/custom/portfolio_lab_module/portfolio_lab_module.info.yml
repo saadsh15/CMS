@@ -1,0 +1,7 @@
+name: 'Portfolio Lab Module (Example Extension)'
+type: module
+description: 'Reference pluggable module demonstrating how future services & widgets integrate into the Portfolio Platform via hook_portfolio_module_info().'
+package: 'Portfolio Modules'
+core_version_requirement: ^10.3 || ^11
+dependencies:
+  - portfolio_core:portfolio_core

@@ -1,0 +1,27 @@
+<?php
+
+/**
+ * @file
+ * Reference pluggable module for the Portfolio Platform.
+ */
+
+/**
+ * Implements hook_portfolio_module_info().
+ */
+function portfolio_lab_module_portfolio_module_info(): array {
+  return [
+    'lab-status' => [
+      'id' => 'lab-status',
+      'name' => 'Build Lab',
+      'description' => 'Live engineering telemetry, active sprint experiments, and focus radar.',
+      'version' => '1.0.0',
+      'route' => '/m/lab-status',
+      'api_endpoint' => '/api/v1/modules/lab-status',
+      'icon' => 'flask-conical',
+      'show_in_nav' => TRUE,
+      'embeddable' => TRUE,
+      'widgets' => ['primary', 'compact'],
+      'status' => 'active',
+    ],
+  ];
+}

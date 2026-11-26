@@ -1,0 +1,16 @@
+services:
+  portfolio_core.module_registry:
+    class: Drupal\portfolio_core\Service\ModuleRegistry
+    arguments: ['@module_handler']
+
+  portfolio_core.content_serializer:
+    class: Drupal\portfolio_core\Service\ContentSerializer
+    arguments: ['@entity_type.manager']
+
+  portfolio_core.revalidation_notifier:
+    class: Drupal\portfolio_core\Service\RevalidationNotifier
+    arguments: ['@http_client', '@logger.factory']
+
+  portfolio_core.sample_seeder:
+    class: Drupal\portfolio_core\Service\SampleContentSeeder
+    arguments: ['@entity_type.manager']

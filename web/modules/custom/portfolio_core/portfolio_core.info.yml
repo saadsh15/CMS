@@ -1,0 +1,16 @@
+name: 'Portfolio Core CMS'
+type: module
+description: 'Core content types (Modular Pages, Projects, Blog Posts), Taxonomies, Module Registry, REST API, and Next.js on-demand revalidation.'
+package: 'Portfolio Platform'
+core_version_requirement: ^10.3 || ^11
+dependencies:
+  - drupal:node
+  - drupal:field
+  - drupal:options
+  - drupal:text
+  - drupal:datetime
+  - drupal:taxonomy
+  - drupal:jsonapi
+  - paragraphs:paragraphs
+  - entity_reference_revisions:entity_reference_revisions
+  - portfolio_builder:portfolio_builder

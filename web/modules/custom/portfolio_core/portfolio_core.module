@@ -1,0 +1,105 @@
+<?php
+
+/**
+ * @file
+ * Hooks for Portfolio Core CMS (module registration & Next.js revalidation).
+ */
+
+use Drupal\Core\Entity\EntityInterface;
+
+/**
+ * Implements hook_portfolio_module_info().
+ *
+ * Registers built-in core modules so the platform module registry knows about them.
+ */
+function portfolio_core_portfolio_module_info(): array {
+  return [
+    'page-builder' => [
+      'id' => 'page-builder',
+      'name' => 'Modular Page Builder',
+      'description' => 'Paragraph-driven Hero, Bento Grid, Dynamic Showcase, Rich Text, Stats, Media Gallery, CTA, and Module Embed blocks.',
+      'version' => '1.0.0',
+      'route' => '/',
+      'api_endpoint' => '/api/v1/pages',
+      'icon' => 'blocks',
+      'show_in_nav' => FALSE,
+      'embeddable' => FALSE,
+      'widgets' => [],
+      'status' => 'core',
+    ],
+    'projects' => [
+      'id' => 'projects',
+      'name' => 'Projects & Active Builds',
+      'description' => 'Track live "Currently Building" projects with completion progress, milestones, and rich case studies.',
+      'version' => '1.0.0',
+      'route' => '/projects',
+      'api_endpoint' => '/api/v1/projects',
+      'icon' => 'rocket',
+      'show_in_nav' => TRUE,
+      'embeddable' => FALSE,
+      'widgets' => [],
+      'status' => 'core',
+    ],
+    'blog' => [
+      'id' => 'blog',
+      'name' => 'Editorial Blog',
+      'description' => 'Technical writing, build logs, architecture deep dives, and tagged articles.',
+      'version' => '1.0.0',
+      'route' => '/blog',
+      'api_endpoint' => '/api/v1/blogs',
+      'icon' => 'book-open',
+      'show_in_nav' => TRUE,
+      'embeddable' => FALSE,
+      'widgets' => [],
+      'status' => 'core',
+    ],
+  ];
+}
+
+/**
+ * Helper to trigger Next.js on-demand revalidation on relevant entity changes.
+ */
+function _portfolio_core_handle_entity_change(EntityInterface $entity): void {
+  $entityType = $entity->getEntityTypeId();
+  if (!in_array($entityType, ['node', 'paragraph', 'taxonomy_term'], TRUE)) {
+    return;
+  }
+
+  $tags = ['cms'];
+  if ($entityType === 'node') {
+    $bundle = $entity->bundle();
+    $tags[] = $bundle;
+    if ($entity->hasField('field_slug') && !$entity->get('field_slug')->isEmpty()) {
+      $slug = $entity->get('field_slug')->value;
+      $tags[] = "{$bundle}:{$slug}";
+    }
+  }
+
+  try {
+    \Drupal::service('portfolio_core.revalidation_notifier')->notify($tags);
+  }
+  catch (\Throwable $e) {
+    // Non-blocking: Next.js might not be running during initial install/seeding.
+  }
+}
+
+/**
+ * Implements hook_entity_insert().
+ */
+function portfolio_core_entity_insert(EntityInterface $entity): void {
+  _portfolio_core_handle_entity_change($entity);
+}
+
+/**
+ * Implements hook_entity_update().
+ */
+function portfolio_core_entity_update(EntityInterface $entity): void {
+  _portfolio_core_handle_entity_change($entity);
+}
+
+/**
+ * Implements hook_entity_delete().
+ */
+function portfolio_core_entity_delete(EntityInterface $entity): void {
+  _portfolio_core_handle_entity_change($entity);
+}

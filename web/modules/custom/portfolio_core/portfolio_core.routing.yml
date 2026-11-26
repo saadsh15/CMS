@@ -1,0 +1,71 @@
+portfolio_core.appearance_settings:
+  path: '/admin/config/system/portfolio-appearance'
+  defaults:
+    _form: '\Drupal\portfolio_core\Form\PortfolioAppearanceForm'
+    _title: 'Portfolio Typography & Appearance'
+  requirements:
+    _permission: 'administer site configuration'
+
+portfolio_core.api_bootstrap:
+  path: '/api/v1/bootstrap'
+  defaults:
+    _controller: '\Drupal\portfolio_core\Controller\PortfolioApiController::bootstrap'
+  methods: [GET]
+  requirements:
+    _access: 'TRUE'
+
+portfolio_core.api_modules:
+  path: '/api/v1/modules'
+  defaults:
+    _controller: '\Drupal\portfolio_core\Controller\PortfolioApiController::modules'
+  methods: [GET]
+  requirements:
+    _access: 'TRUE'
+
+portfolio_core.api_pages:
+  path: '/api/v1/pages'
+  defaults:
+    _controller: '\Drupal\portfolio_core\Controller\PortfolioApiController::pages'
+  methods: [GET]
+  requirements:
+    _access: 'TRUE'
+
+portfolio_core.api_page_detail:
+  path: '/api/v1/pages/{slug}'
+  defaults:
+    _controller: '\Drupal\portfolio_core\Controller\PortfolioApiController::pageBySlug'
+  methods: [GET]
+  requirements:
+    _access: 'TRUE'
+
+portfolio_core.api_projects:
+  path: '/api/v1/projects'
+  defaults:
+    _controller: '\Drupal\portfolio_core\Controller\PortfolioApiController::projects'
+  methods: [GET]
+  requirements:
+    _access: 'TRUE'
+
+portfolio_core.api_project_detail:
+  path: '/api/v1/projects/{slug}'
+  defaults:
+    _controller: '\Drupal\portfolio_core\Controller\PortfolioApiController::projectBySlug'
+  methods: [GET]
+  requirements:
+    _access: 'TRUE'
+
+portfolio_core.api_blogs:
+  path: '/api/v1/blogs'
+  defaults:
+    _controller: '\Drupal\portfolio_core\Controller\PortfolioApiController::blogs'
+  methods: [GET]
+  requirements:
+    _access: 'TRUE'
+
+portfolio_core.api_blog_detail:
+  path: '/api/v1/blogs/{slug}'
+  defaults:
+    _controller: '\Drupal\portfolio_core\Controller\PortfolioApiController::blogBySlug'
+  methods: [GET]
+  requirements:
+    _access: 'TRUE'

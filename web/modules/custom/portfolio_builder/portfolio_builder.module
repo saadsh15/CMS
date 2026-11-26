@@ -1,0 +1,23 @@
+<?php
+
+/**
+ * @file
+ * Website builder helper hooks and block definitions for Portfolio Platform.
+ */
+
+/**
+ * Returns the list of top-level website builder paragraph bundle IDs.
+ */
+function portfolio_builder_top_level_bundles(): array {
+  return [
+    'hero_section',
+    'background_banner',
+    'bento_grid',
+    'showcase_block',
+    'rich_text_block',
+    'stats_strip',
+    'media_gallery',
+    'cta_banner',
+    'module_embed',
+  ];
+}

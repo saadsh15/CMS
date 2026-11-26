@@ -1,0 +1,284 @@
+<?php
+
+/**
+ * @file
+ * Installs content types, taxonomies, and fields for Portfolio Core CMS.
+ */
+
+use Drupal\Core\Entity\Entity\EntityFormDisplay;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\node\Entity\NodeType;
+use Drupal\taxonomy\Entity\Vocabulary;
+
+/**
+ * Ensures a taxonomy vocabulary exists.
+ */
+function _portfolio_core_ensure_vocabulary(string $vid, string $name, string $description): void {
+  if (!Vocabulary::load($vid)) {
+    Vocabulary::create([
+      'vid' => $vid,
+      'name' => $name,
+      'description' => $description,
+    ])->save();
+  }
+}
+
+/**
+ * Ensures a node content type exists.
+ */
+function _portfolio_core_ensure_node_type(string $type, string $name, string $description): void {
+  if (!NodeType::load($type)) {
+    NodeType::create([
+      'type' => $type,
+      'name' => $name,
+      'description' => $description,
+      'display_submitted' => FALSE,
+    ])->save();
+  }
+}
+
+/**
+ * Ensures a field storage, field instance, and form display widget on a node.
+ */
+function _portfolio_core_ensure_node_field(
+  string $bundle,
+  string $field_name,
+  string $type,
+  string $label,
+  array $storage_settings = [],
+  array $field_settings = [],
+  int $cardinality = 1,
+  string $widget = '',
+  int $weight = 0,
+  string $description = '',
+  bool $required = FALSE,
+): void {
+  if (!FieldStorageConfig::loadByName('node', $field_name)) {
+    FieldStorageConfig::create([
+      'field_name' => $field_name,
+      'entity_type' => 'node',
+      'type' => $type,
+      'cardinality' => $cardinality,
+      'settings' => $storage_settings,
+    ])->save();
+  }
+
+  if (!FieldConfig::loadByName('node', $bundle, $field_name)) {
+    FieldConfig::create([
+      'field_name' => $field_name,
+      'entity_type' => 'node',
+      'bundle' => $bundle,
+      'label' => $label,
+      'description' => $description,
+      'required' => $required,
+      'settings' => $field_settings,
+    ])->save();
+  }
+
+  $form_display = EntityFormDisplay::load("node.{$bundle}.default");
+  if (!$form_display) {
+    $form_display = EntityFormDisplay::create([
+      'targetEntityType' => 'node',
+      'bundle' => $bundle,
+      'mode' => 'default',
+      'status' => TRUE,
+    ]);
+  }
+
+  $default_widgets = [
+    'string' => 'string_textfield',
+    'string_long' => 'string_textarea',
+    'text_long' => 'text_textarea',
+    'integer' => 'number',
+    'boolean' => 'boolean_checkbox',
+    'list_string' => 'options_select',
+    'datetime' => 'datetime_default',
+    'entity_reference' => 'entity_reference_autocomplete_tags',
+    'entity_reference_revisions' => 'paragraphs',
+  ];
+
+  $form_display->setComponent($field_name, [
+    'type' => $widget ?: ($default_widgets[$type] ?? 'string_textfield'),
+    'weight' => $weight,
+  ])->save();
+}
+
+/**
+ * Implements hook_install().
+ */
+function portfolio_core_install(): void {
+  // ---------------------------------------------------------------------------
+  // 1. Taxonomies
+  // ---------------------------------------------------------------------------
+  _portfolio_core_ensure_vocabulary('tech_stack', 'Tech Stack', 'Technologies, frameworks, and tools used in projects.');
+  _portfolio_core_ensure_vocabulary('blog_category', 'Blog Categories', 'Primary topic categories for blog posts.');
+  _portfolio_core_ensure_vocabulary('blog_tag', 'Blog Tags', 'Fine-grained tags for blog articles.');
+
+  $builder_bundles = function_exists('portfolio_builder_top_level_bundles')
+    ? portfolio_builder_top_level_bundles()
+    : [
+      'hero_section',
+      'bento_grid',
+      'showcase_block',
+      'rich_text_block',
+      'stats_strip',
+      'media_gallery',
+      'cta_banner',
+      'module_embed',
+    ];
+
+  $target_bundles = array_combine($builder_bundles, $builder_bundles);
+  $drag_drop = [];
+  foreach ($builder_bundles as $idx => $b) {
+    $drag_drop[$b] = ['weight' => $idx, 'enabled' => TRUE];
+  }
+
+  $sections_field_settings = [
+    'handler' => 'default:paragraph',
+    'handler_settings' => [
+      'negate' => 0,
+      'target_bundles' => $target_bundles,
+      'target_bundles_drag_drop' => $drag_drop,
+    ],
+  ];
+
+  // ---------------------------------------------------------------------------
+  // 2. Content Type: Modular Page (portfolio_page)
+  // ---------------------------------------------------------------------------
+  _portfolio_core_ensure_node_type(
+    'portfolio_page',
+    'Modular Page',
+    'Website page composed of reorderable Website Building Modules (Hero, Bento Grid, Showcases, Rich Text, Module Embeds).'
+  );
+  _portfolio_core_ensure_node_field('portfolio_page', 'field_slug', 'string', 'URL Slug', [], [], 1, 'string_textfield', 1, 'Use "home" for the homepage, or any path like "about", "uses", "now".', TRUE);
+  _portfolio_core_ensure_node_field('portfolio_page', 'field_meta_description', 'string_long', 'SEO Meta Description', [], [], 1, 'string_textarea', 2);
+  _portfolio_core_ensure_node_field('portfolio_page', 'field_show_in_nav', 'boolean', 'Show in Top Navigation', [], [], 1, 'boolean_checkbox', 3);
+  _portfolio_core_ensure_node_field('portfolio_page', 'field_nav_order', 'integer', 'Navigation Order', [], [], 1, 'number', 4);
+  _portfolio_core_ensure_node_field(
+    'portfolio_page',
+    'field_sections',
+    'entity_reference_revisions',
+    'Page Builder Sections',
+    ['target_type' => 'paragraph'],
+    $sections_field_settings,
+    -1,
+    'paragraphs',
+    5,
+    'Add, edit, and drag-reorder website building blocks for this page.'
+  );
+
+  // ---------------------------------------------------------------------------
+  // 3. Content Type: Project (project)
+  // ---------------------------------------------------------------------------
+  _portfolio_core_ensure_node_type(
+    'project',
+    'Project',
+    'Portfolio projects including Currently Working On builds, progress tracking, milestones, tech stack, and modular case study sections.'
+  );
+  _portfolio_core_ensure_node_field('project', 'field_slug', 'string', 'URL Slug', [], [], 1, 'string_textfield', 1, 'URL-friendly identifier, e.g. cibs-lesco', TRUE);
+  _portfolio_core_ensure_node_field('project', 'field_role', 'string', 'My Role', [], [], 1, 'string_textfield', 2, 'e.g. Full-Stack Developer, ML Engineer, Data Engineer');
+  _portfolio_core_ensure_node_field('project', 'field_summary', 'string_long', 'Short Pitch / Summary', [], [], 1, 'string_textarea', 3, '', TRUE);
+  _portfolio_core_ensure_node_field('project', 'field_status', 'list_string', 'Build Status', [
+    'allowed_values' => [
+      'in_progress' => 'Currently Building',
+      'launched' => 'Shipped / Live',
+      'research' => 'R&D / Exploring',
+      'archived' => 'Archived',
+    ],
+  ], [], 1, 'options_select', 3, '', TRUE);
+  _portfolio_core_ensure_node_field('project', 'field_progress', 'integer', 'Completion Progress (%)', [], ['min' => 0, 'max' => 100], 1, 'number', 4, '0 to 100 — displayed on active build cards.');
+  _portfolio_core_ensure_node_field('project', 'field_current_milestone', 'string', 'Current Focus / Milestone', [], [], 1, 'string_textfield', 5, 'What you are actively working on in this project right now.');
+  _portfolio_core_ensure_node_field('project', 'field_featured', 'boolean', 'Featured Project', [], [], 1, 'boolean_checkbox', 6);
+  _portfolio_core_ensure_node_field('project', 'field_accent', 'list_string', 'Card Accent Color', [
+    'allowed_values' => [
+      'cyan' => 'Electric Cyan',
+      'violet' => 'Vibrant Violet',
+      'emerald' => 'Neon Emerald',
+      'amber' => 'Warm Amber',
+      'rose' => 'Signal Rose',
+    ],
+  ], [], 1, 'options_select', 7);
+  _portfolio_core_ensure_node_field(
+    'project',
+    'field_tech_stack',
+    'entity_reference',
+    'Tech Stack',
+    ['target_type' => 'taxonomy_term'],
+    [
+      'handler' => 'default:taxonomy_term',
+      'handler_settings' => [
+        'target_bundles' => ['tech_stack' => 'tech_stack'],
+        'auto_create' => TRUE,
+      ],
+    ],
+    -1,
+    'entity_reference_autocomplete_tags',
+    8
+  );
+  _portfolio_core_ensure_node_field('project', 'field_repo_url', 'string', 'Repository URL', [], [], 1, 'string_textfield', 9);
+  _portfolio_core_ensure_node_field('project', 'field_live_url', 'string', 'Live Demo URL', [], [], 1, 'string_textfield', 10);
+  _portfolio_core_ensure_node_field('project', 'field_cover_url', 'string', 'Cover Image URL (optional)', [], [], 1, 'string_textfield', 11);
+  _portfolio_core_ensure_node_field('project', 'field_body', 'text_long', 'Full Case Study / Architecture Notes', [], [], 1, 'text_textarea', 12);
+  _portfolio_core_ensure_node_field(
+    'project',
+    'field_sections',
+    'entity_reference_revisions',
+    'Optional Extra Page Builder Sections',
+    ['target_type' => 'paragraph'],
+    $sections_field_settings,
+    -1,
+    'paragraphs',
+    13
+  );
+
+  // ---------------------------------------------------------------------------
+  // 4. Content Type: Blog Post (blog_post)
+  // ---------------------------------------------------------------------------
+  _portfolio_core_ensure_node_type(
+    'blog_post',
+    'Blog Post',
+    'Technical articles, build logs, architecture deep-dives, and personal essays.'
+  );
+  _portfolio_core_ensure_node_field('blog_post', 'field_slug', 'string', 'URL Slug', [], [], 1, 'string_textfield', 1, '', TRUE);
+  _portfolio_core_ensure_node_field('blog_post', 'field_summary', 'string_long', 'Excerpt / Summary', [], [], 1, 'string_textarea', 2, '', TRUE);
+  _portfolio_core_ensure_node_field(
+    'blog_post',
+    'field_category',
+    'entity_reference',
+    'Category',
+    ['target_type' => 'taxonomy_term'],
+    [
+      'handler' => 'default:taxonomy_term',
+      'handler_settings' => [
+        'target_bundles' => ['blog_category' => 'blog_category'],
+        'auto_create' => TRUE,
+      ],
+    ],
+    1,
+    'entity_reference_autocomplete',
+    3
+  );
+  _portfolio_core_ensure_node_field(
+    'blog_post',
+    'field_tags',
+    'entity_reference',
+    'Tags',
+    ['target_type' => 'taxonomy_term'],
+    [
+      'handler' => 'default:taxonomy_term',
+      'handler_settings' => [
+        'target_bundles' => ['blog_tag' => 'blog_tag'],
+        'auto_create' => TRUE,
+      ],
+    ],
+    -1,
+    'entity_reference_autocomplete_tags',
+    4
+  );
+  _portfolio_core_ensure_node_field('blog_post', 'field_reading_time', 'integer', 'Reading Time (minutes)', [], ['min' => 1, 'max' => 120], 1, 'number', 5);
+  _portfolio_core_ensure_node_field('blog_post', 'field_featured', 'boolean', 'Featured Post', [], [], 1, 'boolean_checkbox', 6);
+  _portfolio_core_ensure_node_field('blog_post', 'field_published_date', 'datetime', 'Published Date', ['datetime_type' => 'date'], [], 1, 'datetime_default', 7);
+  _portfolio_core_ensure_node_field('blog_post', 'field_cover_url', 'string', 'Cover Image URL (optional)', [], [], 1, 'string_textfield', 8);
+  _portfolio_core_ensure_node_field('blog_post', 'field_body', 'text_long', 'Article Content', [], [], 1, 'text_textarea', 9, '', TRUE);
+}

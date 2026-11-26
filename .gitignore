@@ -1,0 +1,7 @@
+.env
+.env.local
+vendor/
+web/sites/default/files/
+web/sites/default/settings.php
+.DS_Store
+*.log

@@ -1,0 +1,7 @@
+portfolio_lab_module.status:
+  path: '/api/v1/modules/lab-status'
+  defaults:
+    _controller: '\Drupal\portfolio_lab_module\Controller\LabController::status'
+  methods: [GET]
+  requirements:
+    _access: 'TRUE'
